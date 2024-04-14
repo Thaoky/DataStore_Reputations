@@ -4,312 +4,258 @@ June 22st, 2009
 --]]
 if not DataStore then return end
 
-local addonName = "DataStore_Reputations"
+local addonName, addon = ...
+local thisCharacter
+local currentGuildName
 
-_G[addonName] = LibStub("AceAddon-3.0"):NewAddon(addonName, "AceConsole-3.0", "AceEvent-3.0")
+local DataStore, select = DataStore, select
+local GetNumFactions, GetFactionInfo, ExpandFactionHeader, CollapseFactionHeader = GetNumFactions, GetFactionInfo, ExpandFactionHeader, CollapseFactionHeader
+local GetFactionInfoByID, IsInGuild, GetGuildInfo = GetFactionInfoByID, IsInGuild, GetGuildInfo
+local C_Reputation, C_MajorFactions, C_GossipInfo = C_Reputation, C_MajorFactions, C_GossipInfo
+local isRetail = (WOW_PROJECT_ID == WOW_PROJECT_MAINLINE)
 
-local addon = _G[addonName]
+local FACTION_TYPE_NORMAL = 0				-- Normal faction, save : earned
+local FACTION_TYPE_FRIENDSHIP = 1		-- Friendship faction, save : level, earned, threshold
+local FACTION_TYPE_MAJOR = 2				-- Major faction, save : level, earned, threshold
 
-local PARAGON_LABEL = "Paragon"
-
-local AddonDB_Defaults = {
-	global = {
-		Reference = {
-			UIDsRev = {},		-- ex: Reverse lookup of Faction UIDs, now in the database since opposite faction is no longer provided by the API
-		},
-		Characters = {
-			['*'] = {				-- ["Account.Realm.Name"] 
-				lastUpdate = nil,
-				guildName = nil,		-- nil = not in a guild, as returned by GetGuildInfo("player")
-				guildRep = nil,
-				Factions = {},
-			}
-		}
-	}
-}
-
--- ** Reference tables **
-local BottomLevelNames = {
-	[-42000] = FACTION_STANDING_LABEL1,	 -- "Hated"
-	[-6000] = FACTION_STANDING_LABEL2,	 -- "Hostile"
-	[-3000] = FACTION_STANDING_LABEL3,	 -- "Unfriendly"
-	[0] = FACTION_STANDING_LABEL4,		 -- "Neutral"
-	[3000] = FACTION_STANDING_LABEL5,	 -- "Friendly"
-	[9000] = FACTION_STANDING_LABEL6,	 -- "Honored"
-	[21000] = FACTION_STANDING_LABEL7,	 -- "Revered"
-	[42000] = FACTION_STANDING_LABEL8,	 -- "Exalted"
-	[43000] = PARAGON_LABEL,	 -- "Paragon"
-}
-
-local BottomLevels = { -42000, -6000, -3000, 0, 3000, 9000, 21000, 42000, 43000 }
-
-local BF = LibStub("LibBabble-Faction-3.0"):GetUnstrictLookupTable()
-
---[[	*** Faction UIDs ***
-These UIDs have 2 purposes: 
-- avoid saving numerous copies of the same string (the faction name)
-- minimize the amount of data sent across the network when sharing accounts (since both sides have the same reference table)
-
-Note: Let the system manage the ids, DO NOT delete entries from this table, if a faction is removed from the game, mark it as OLD_ or whatever.
-
-Since WoD, GetFactionInfoByID does not return a value when an alliance player asks for an horde faction.
-Default to an english text.
-
-Note 2 : now that this DataStore module works will all versions, be sure to preserve the insertion order !!
-
-At the next expansion, reorder this whole thing and request a database reset.
---]]
-
+local enum = DataStore.Enum
+local factionStandingLabels = enum.FactionStandingLabels
+local factionStandingThresholds = enum.FactionStandingThresholds
+local bit64 = LibStub("LibBit64")
 
 local factions = {}
+local factionNameToId = {}
 
-table.insert(factions, { id = 69, name = BF["Darnassus"] })
+do 
+	-- Keep the loading of factions in a narrow scope with do-end
+	local isVanilla = (WOW_PROJECT_ID == WOW_PROJECT_CLASSIC)
+	local isWotLK = (WOW_PROJECT_ID == WOW_PROJECT_WRATH_CLASSIC)
+	local BF = LibStub("LibBabble-Faction-3.0"):GetUnstrictLookupTable()
 
-if WOW_PROJECT_ID ~= WOW_PROJECT_CLASSIC then
-	table.insert(factions, { id = 930, name = BF["Exodar"] })
-end
+	local function AddFaction(id, text)
+		text = text or GetFactionInfoByID(id)
+		factions[id] = text
+		
+		if not text then
+			print("no value for id : " .. id)
+		end
+		factionNameToId[text] = id
+	end
 
-if WOW_PROJECT_ID == WOW_PROJECT_WRATH_CLASSIC then
-	table.insert(factions, { id = 54, name = BF["Gnomeregan Exiles"] })
-else
-	table.insert(factions, { id = 54, name = BF["Gnomeregan"] })
-end
+	AddFaction(21, BF["Booty Bay"])
+	AddFaction(47, BF["Ironforge"])
+	AddFaction(54, isWotLK and BF["Gnomeregan Exiles"] or BF["Gnomeregan"])
+	AddFaction(59, BF["Thorium Brotherhood"])
+	AddFaction(68, BF["Undercity"])
+	AddFaction(69, BF["Darnassus"])
+	AddFaction(70, BF["Syndicate"])
+	AddFaction(72, BF["Stormwind"])
+	AddFaction(76, BF["Orgrimmar"])
+	AddFaction(81, BF["Thunder Bluff"])
+	AddFaction(87, BF["Bloodsail Buccaneers"])
+	AddFaction(92, BF["Gelkis Clan Centaur"])
+	AddFaction(93, BF["Magram Clan Centaur"])
+	AddFaction(270, BF["Zandalar Tribe"])
+	AddFaction(349, BF["Ravenholdt"])
+	AddFaction(369, BF["Gadgetzan"])
+	AddFaction(470, BF["Ratchet"])
+	AddFaction(509, BF["The League of Arathor"])
+	AddFaction(510, BF["The Defilers"])
+	AddFaction(529, BF["Argent Dawn"])
+	AddFaction(530, BF["Darkspear Trolls"])
+	AddFaction(576, BF["Timbermaw Hold"])
+	AddFaction(577, BF["Everlook"])
+	AddFaction(589, BF["Wintersaber Trainers"])
+	AddFaction(609, BF["Cenarion Circle"])
+	AddFaction(729, BF["Frostwolf Clan"])
+	AddFaction(730, BF["Stormpike Guard"])
+	AddFaction(749, BF["Hydraxian Waterlords"])
+	AddFaction(809, BF["Shen'dralar"])
+	AddFaction(889, BF["Warsong Outriders"])
+	AddFaction(890, BF["Silverwing Sentinels"])
+	AddFaction(909, BF["Darkmoon Faire"])
+	AddFaction(910, BF["Brood of Nozdormu"])
 
-table.insert(factions, { id = 47, name = BF["Ironforge"] })
-table.insert(factions, { id = 72, name = BF["Stormwind"] })
-table.insert(factions, { id = 530, name = BF["Darkspear Trolls"] })
-table.insert(factions, { id = 76, name = BF["Orgrimmar"] })
-table.insert(factions, { id = 81, name = BF["Thunder Bluff"] })
-table.insert(factions, { id = 68, name = BF["Undercity"] })
+	if not isVanilla then
+		AddFaction(911, BF["Silvermoon City"])
+		AddFaction(922, BF["Tranquillien"])
+		AddFaction(930, BF["Exodar"])
+		-- LK & later
 
-if WOW_PROJECT_ID ~= WOW_PROJECT_CLASSIC then
-	table.insert(factions, { id = 911, name = BF["Silvermoon City"] })
-end
-	
-table.insert(factions, { id = 509, name = BF["The League of Arathor"] })
-table.insert(factions, { id = 890, name = BF["Silverwing Sentinels"] })
-table.insert(factions, { id = 730, name = BF["Stormpike Guard"] })
-table.insert(factions, { id = 510, name = BF["The Defilers"] })
-table.insert(factions, { id = 889, name = BF["Warsong Outriders"] })
-table.insert(factions, { id = 729, name = BF["Frostwolf Clan"] })
-table.insert(factions, { id = 21, name = BF["Booty Bay"] })
-table.insert(factions, { id = 577, name = BF["Everlook"] })
-table.insert(factions, { id = 369, name = BF["Gadgetzan"] })
-table.insert(factions, { id = 470, name = BF["Ratchet"] })
-table.insert(factions, { id = 529, name = BF["Argent Dawn"] })
-table.insert(factions, { id = 87, name = BF["Bloodsail Buccaneers"] })
-table.insert(factions, { id = 910, name = BF["Brood of Nozdormu"] })
-table.insert(factions, { id = 609, name = BF["Cenarion Circle"] })
-table.insert(factions, { id = 909, name = BF["Darkmoon Faire"] })
-table.insert(factions, { id = 92, name = BF["Gelkis Clan Centaur"] })
-table.insert(factions, { id = 749, name = BF["Hydraxian Waterlords"] })
-table.insert(factions, { id = 93, name = BF["Magram Clan Centaur"] })
-table.insert(factions, { id = 349, name = BF["Ravenholdt"] })
-table.insert(factions, { id = 809, name = BF["Shen'dralar"] })
-table.insert(factions, { id = 70, name = BF["Syndicate"] })
-table.insert(factions, { id = 59, name = BF["Thorium Brotherhood"] })
-table.insert(factions, { id = 576, name = BF["Timbermaw Hold"] })
+		-- The Burning Crusade
+		AddFaction(1012, BF["Ashtongue Deathsworn"])
+		AddFaction(942, BF["Cenarion Expedition"])
+		AddFaction(933, BF["The Consortium"])
+		AddFaction(946, BF["Honor Hold"])
+		AddFaction(978, BF["Kurenai"])
+		AddFaction(941, BF["The Mag'har"])
+		AddFaction(1015, BF["Netherwing"])
+		AddFaction(1038, BF["Ogri'la"])
+		AddFaction(970, BF["Sporeggar"])
+		AddFaction(947, BF["Thrallmar"])
+		AddFaction(1011, BF["Lower City"])
+		AddFaction(1031, BF["Sha'tari Skyguard"])
+		AddFaction(1077, BF["Shattered Sun Offensive"])
+		AddFaction(932, BF["The Aldor"])
+		AddFaction(934, BF["The Scryers"])
+		AddFaction(935, BF["The Sha'tar"])
+		AddFaction(989, BF["Keepers of Time"])
+		AddFaction(990, BF["The Scale of the Sands"])
+		AddFaction(967, BF["The Violet Eye"])
 
-if WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then
-	table.insert(factions, { id = 471, name = BF["Wildhammer Clan"] })
-end
+		-- Wrath of the Lich King
+		AddFaction(1106, BF["Argent Crusade"])
+		AddFaction(1090, BF["Kirin Tor"])
+		AddFaction(1073, BF["The Kalu'ak"])
+		AddFaction(1091, BF["The Wyrmrest Accord"])
+		AddFaction(1098, BF["Knights of the Ebon Blade"])
+		AddFaction(1119, BF["The Sons of Hodir"])
+		AddFaction(1156, BF["The Ashen Verdict"])
+		AddFaction(1037, BF["Alliance Vanguard"])
+		AddFaction(1068, BF["Explorers' League"])
+		AddFaction(1126, BF["The Frostborn"])
+		AddFaction(1094, BF["The Silver Covenant"])
+		AddFaction(1050, BF["Valiance Expedition"])
+		AddFaction(1052, BF["Horde Expedition"])
+		AddFaction(1067, BF["The Hand of Vengeance"])
+		AddFaction(1124, BF["The Sunreavers"])
+		AddFaction(1064, BF["The Taunka"])
+		AddFaction(1085, BF["Warsong Offensive"])
+		AddFaction(1104, BF["Frenzyheart Tribe"])
+		AddFaction(1105, BF["The Oracles"])
+		AddFaction(469, BF["Alliance"])
+		AddFaction(67, BF["Horde"])
+		AddFaction(1134, BF["Gilneas"])
+		AddFaction(1133, BF["Bilgewater Cartel"])
+	end
 
-if WOW_PROJECT_ID ~= WOW_PROJECT_CLASSIC then
-	table.insert(factions, { id = 922, name = BF["Tranquillien"] })
-end
+	if not isRetail then
+		AddFaction(471, BF["Wildhammer Clan"])
+	else
 
-table.insert(factions, { id = 589, name = BF["Wintersaber Trainers"] })
-table.insert(factions, { id = 270, name = BF["Zandalar Tribe"] })
+		-- cataclysm
+		AddFaction(1158, BF["Guardians of Hyjal"])
+		AddFaction(1135, BF["The Earthen Ring"])
+		AddFaction(1171, BF["Therazane"])
+		AddFaction(1174, BF["Wildhammer Clan"])
+		AddFaction(1173, BF["Ramkahen"])
+		AddFaction(1177, BF["Baradin's Wardens"])
+		AddFaction(1172, BF["Dragonmaw Clan"])
+		AddFaction(1178, BF["Hellscream's Reach"])
+		AddFaction(1204, BF["Avengers of Hyjal"])
 
-if WOW_PROJECT_ID ~= WOW_PROJECT_CLASSIC then
-	-- LK & later
+		-- Mists of Pandaria
+		AddFaction(1277, BF["Chee Chee"])
+		AddFaction(1275, BF["Ella"])
+		AddFaction(1283, BF["Farmer Fung"])
+		AddFaction(1282, BF["Fish Fellreed"])
+		AddFaction(1228, BF["Forest Hozen"])
+		AddFaction(1281, BF["Gina Mudclaw"])
+		AddFaction(1269, BF["Golden Lotus"])
+		AddFaction(1279, BF["Haohan Mudclaw"])
+		AddFaction(1273, BF["Jogu the Drunk"])
+		AddFaction(1276, BF["Old Hillpaw"])
+		AddFaction(1271, BF["Order of the Cloud Serpent"])
+		AddFaction(1242, BF["Pearlfin Jinyu"])
+		AddFaction(1270, BF["Shado-Pan"])
+		AddFaction(1216, BF["Shang Xi's Academy"])
+		AddFaction(1278, BF["Sho"])
+		AddFaction(1302, BF["The Anglers"])
+		AddFaction(1341, BF["The August Celestials"])
+		AddFaction(1358, BF["Nat Pagle"])
+		AddFaction(1359, BF["The Black Prince"])
+		AddFaction(1351, BF["The Brewmasters"])
+		AddFaction(1337, BF["The Klaxxi"])
+		AddFaction(1345, BF["The Lorewalkers"])
+		AddFaction(1272, BF["The Tillers"])
+		AddFaction(1280, BF["Tina Mudclaw"])
+		AddFaction(1353, BF["Tushui Pandaren"])
+		AddFaction(1352, BF["Huojin Pandaren"])
+		AddFaction(1376, BF["Operation: Shieldwall"])
+		AddFaction(1387, BF["Kirin Tor Offensive"])
+		AddFaction(1375, BF["Dominance Offensive"])
+		AddFaction(1388, BF["Sunreaver Onslaught"])
+		AddFaction(1435, BF["Shado-Pan Assault"])
+		AddFaction(1440, BF["Darkspear Rebellion"])
+		AddFaction(1492, BF["Emperor Shaohao"])
 
-	-- The Burning Crusade
-	table.insert(factions, { id = 1012, name = BF["Ashtongue Deathsworn"] })
-	table.insert(factions, { id = 942, name = BF["Cenarion Expedition"] })
-	table.insert(factions, { id = 933, name = BF["The Consortium"] })
-	table.insert(factions, { id = 946, name = BF["Honor Hold"] })
-	table.insert(factions, { id = 978, name = BF["Kurenai"] })
-	table.insert(factions, { id = 941, name = BF["The Mag'har"] })
-	table.insert(factions, { id = 1015, name = BF["Netherwing"] })
-	table.insert(factions, { id = 1038, name = BF["Ogri'la"] })
-	table.insert(factions, { id = 970, name = BF["Sporeggar"] })
-	table.insert(factions, { id = 947, name = BF["Thrallmar"] })
-	table.insert(factions, { id = 1011, name = BF["Lower City"] })
-	table.insert(factions, { id = 1031, name = BF["Sha'tari Skyguard"] })
-	table.insert(factions, { id = 1077, name = BF["Shattered Sun Offensive"] })
-	table.insert(factions, { id = 932, name = BF["The Aldor"] })
-	table.insert(factions, { id = 934, name = BF["The Scryers"] })
-	table.insert(factions, { id = 935, name = BF["The Sha'tar"] })
-	table.insert(factions, { id = 989, name = BF["Keepers of Time"] })
-	table.insert(factions, { id = 990, name = BF["The Scale of the Sands"] })
-	table.insert(factions, { id = 967, name = BF["The Violet Eye"] })
+		-- Warlords of Draenor
+		AddFaction(1515)		-- Arrakoa Outcasts
+		AddFaction(1731)		-- Council of Exarchs
+		AddFaction(1445)		-- Frostwold Orcs
+		AddFaction(1710)		-- Sha'tari Defense
+		AddFaction(1711)		-- Steamwheedle Preservation Society
+		AddFaction(1682)		-- Wrynn's Vanguard
+		AddFaction(1708)		-- Laughing Skull Orcs
+		AddFaction(1681)		-- Vol'jin's Spear
+		AddFaction(1847)		-- Hand of the Prophet
+		AddFaction(1848)		-- Vol'jin's Headhunters
+		AddFaction(1849)		-- Order of the Awakened
+		AddFaction(1850)		-- The Saberstalkers
 
-	-- Wrath of the Lich King
-	table.insert(factions, { id = 1106, name = BF["Argent Crusade"] })
-	table.insert(factions, { id = 1090, name = BF["Kirin Tor"] })
-	table.insert(factions, { id = 1073, name = BF["The Kalu'ak"] })
-	table.insert(factions, { id = 1091, name = BF["The Wyrmrest Accord"] })
-	table.insert(factions, { id = 1098, name = BF["Knights of the Ebon Blade"] })
-	table.insert(factions, { id = 1119, name = BF["The Sons of Hodir"] })
-	table.insert(factions, { id = 1156, name = BF["The Ashen Verdict"] })
-	table.insert(factions, { id = 1037, name = BF["Alliance Vanguard"] })
-	table.insert(factions, { id = 1068, name = BF["Explorers' League"] })
-	table.insert(factions, { id = 1126, name = BF["The Frostborn"] })
-	table.insert(factions, { id = 1094, name = BF["The Silver Covenant"] })
-	table.insert(factions, { id = 1050, name = BF["Valiance Expedition"] })
-	table.insert(factions, { id = 1052, name = BF["Horde Expedition"] })
-	table.insert(factions, { id = 1067, name = BF["The Hand of Vengeance"] })
-	table.insert(factions, { id = 1124, name = BF["The Sunreavers"] })
-	table.insert(factions, { id = 1064, name = BF["The Taunka"] })
-	table.insert(factions, { id = 1085, name = BF["Warsong Offensive"] })
-	table.insert(factions, { id = 1104, name = BF["Frenzyheart Tribe"] })
-	table.insert(factions, { id = 1105, name = BF["The Oracles"] })
-	table.insert(factions, { id = 469, name = BF["Alliance"] })
-	table.insert(factions, { id = 67, name = BF["Horde"] })
-	table.insert(factions, { id = 1134, name = BF["Gilneas"] })
-	table.insert(factions, { id = 1133, name = BF["Bilgewater Cartel"] })
-end
+		-- Legion
+		AddFaction(1900)		-- Court of Farondis
+		AddFaction(1883)		-- Dreamweavers
+		AddFaction(1828)		-- Highmountain Tribe
+		AddFaction(1948)		-- Valarjar
+		AddFaction(1859)		-- The Nightfallen
+		AddFaction(1894)		-- The Wardens
+		AddFaction(2045)		-- Armies of Legionfall
+		AddFaction(2165)		-- Army of the Light
+		AddFaction(2170)		-- Argussian Reach
+		AddFaction(1975) 		-- Conjurer Margoss
+		AddFaction(2097) 		-- Ilyssia of the Waters
+		AddFaction(2099) 		-- Akule Riverhorn
+		AddFaction(2101) 		-- Sha'leth
+		AddFaction(2100) 		-- Corbyn
+		AddFaction(2102) 		-- Impus
+		AddFaction(2098) 		-- Keeper Raynae
+		AddFaction(2135) 		-- Chromie
 
-if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
+		-- Battle for Azeroth
+		AddFaction(2159)		-- A  - 7th Legion
+		AddFaction(2164)		-- AH - Champions of Azeroth
+		AddFaction(2161)		-- A  - Order of Embers	(alternate ID: 2264 but this seems unused on wowhead)
+		AddFaction(2160)		-- A  - Proudmoore Admiralty (alternate ID: 2120 but this seems unused on wowhead)
+		AddFaction(2162)		-- A  - Storm's Wake (alternate ID: 2265 but this seems unused on wowhead)
+		AddFaction(2156)		-- H  - Talanji's Expedition
+		AddFaction(2157)		-- H  - The Honorbound
+		AddFaction(2163)		-- AH - Tortollan Seekers
+		AddFaction(2158, BF["Voldunai"])		-- H  - Voldunai
+		AddFaction(2103, BF["Zandalari Empire"])		-- H  - Zandalari Empire
+		AddFaction(2400, BF["Waveblade Ankoan"])		-- A  - Waveblade Ankoan
+		AddFaction(2373, BF["The Unshackled"])			-- H  - The Unshackled
+		AddFaction(2391)		-- Rustbolt Resistance
+		AddFaction(2415)		-- 8.3 Rajani
+		AddFaction(2417)		-- 8.3 Uldum Accord
 
-	-- cataclysm
-	table.insert(factions, { id = 1158, name = BF["Guardians of Hyjal"] })
-	table.insert(factions, { id = 1135, name = BF["The Earthen Ring"] })
-	table.insert(factions, { id = 1171, name = BF["Therazane"] })
-	table.insert(factions, { id = 1174, name = BF["Wildhammer Clan"] })
-	table.insert(factions, { id = 1173, name = BF["Ramkahen"] })
-	table.insert(factions, { id = 1177, name = BF["Baradin's Wardens"] })
-	table.insert(factions, { id = 1172, name = BF["Dragonmaw Clan"] })
-	table.insert(factions, { id = 1178, name = BF["Hellscream's Reach"] })
-	table.insert(factions, { id = 1204, name = BF["Avengers of Hyjal"] })
-
-	-- Mists of Pandaria
-	table.insert(factions, { id = 1277, name = BF["Chee Chee"] })
-	table.insert(factions, { id = 1275, name = BF["Ella"] })
-	table.insert(factions, { id = 1283, name = BF["Farmer Fung"] })
-	table.insert(factions, { id = 1282, name = BF["Fish Fellreed"] })
-	table.insert(factions, { id = 1228, name = BF["Forest Hozen"] })
-	table.insert(factions, { id = 1281, name = BF["Gina Mudclaw"] })
-	table.insert(factions, { id = 1269, name = BF["Golden Lotus"] })
-	table.insert(factions, { id = 1279, name = BF["Haohan Mudclaw"] })
-	table.insert(factions, { id = 1273, name = BF["Jogu the Drunk"] })
-	table.insert(factions, { id = 1358, name = BF["Nat Pagle"] })
-	table.insert(factions, { id = 1276, name = BF["Old Hillpaw"] })
-	table.insert(factions, { id = 1271, name = BF["Order of the Cloud Serpent"] })
-	table.insert(factions, { id = 1242, name = BF["Pearlfin Jinyu"] })
-	table.insert(factions, { id = 1270, name = BF["Shado-Pan"] })
-	table.insert(factions, { id = 1216, name = BF["Shang Xi's Academy"] })
-	table.insert(factions, { id = 1278, name = BF["Sho"] })
-	table.insert(factions, { id = 1302, name = BF["The Anglers"] })
-	table.insert(factions, { id = 1341, name = BF["The August Celestials"] })
-	table.insert(factions, { id = 1359, name = BF["The Black Prince"] })
-	table.insert(factions, { id = 1351, name = BF["The Brewmasters"] })
-	table.insert(factions, { id = 1337, name = BF["The Klaxxi"] })
-	table.insert(factions, { id = 1345, name = BF["The Lorewalkers"] })
-	table.insert(factions, { id = 1272, name = BF["The Tillers"] })
-	table.insert(factions, { id = 1280, name = BF["Tina Mudclaw"] })
-	table.insert(factions, { id = 1353, name = BF["Tushui Pandaren"] })
-	table.insert(factions, { id = 1352, name = BF["Huojin Pandaren"] })
-
-	table.insert(factions, { id = 1376, name = BF["Operation: Shieldwall"] })
-	table.insert(factions, { id = 1387, name = BF["Kirin Tor Offensive"] })
-	table.insert(factions, {}) -- was "Akama's Trust", keep this index empty
-	table.insert(factions, { id = 1375, name = BF["Dominance Offensive"] })
-	table.insert(factions, { id = 1388, name = BF["Sunreaver Onslaught"] })
-	table.insert(factions, { id = 1435, name = BF["Shado-Pan Assault"] })
-	table.insert(factions, { id = 1440, name = BF["Darkspear Rebellion"] })
-	table.insert(factions, { id = 1492, name = GetFactionInfoByID(1492) })		-- BF["Emperor Shaohao"]
-
-	-- Warlords of Draenor
-	table.insert(factions, { id = 1515, name = GetFactionInfoByID(1515) })		-- Arrakoa Outcasts
-	table.insert(factions, { id = 1731, name = GetFactionInfoByID(1731) })		-- Council of Exarchs
-	table.insert(factions, { id = 1445, name = GetFactionInfoByID(1445) })		-- Frostwold Orcs
-	table.insert(factions, { id = 1710, name = GetFactionInfoByID(1710) })		-- Sha'tari Defense
-	table.insert(factions, { id = 1711, name = GetFactionInfoByID(1711) })		-- Steamwheedle Preservation Society
-	table.insert(factions, { id = 1682, name = GetFactionInfoByID(1682) })		-- Wrynn's Vanguard
-	table.insert(factions, { id = 1708, name = GetFactionInfoByID(1708) })		-- Laughing Skull Orcs
-	table.insert(factions, { id = 1681, name = GetFactionInfoByID(1681) })		-- Vol'jin's Spear
-	table.insert(factions, { id = 1847, name = GetFactionInfoByID(1847) })		-- Hand of the Prophet
-	table.insert(factions, { id = 1848, name = GetFactionInfoByID(1848) })		-- Vol'jin's Headhunters
-	table.insert(factions, { id = 1849, name = GetFactionInfoByID(1849) })		-- Order of the Awakened
-	table.insert(factions, { id = 1850, name = GetFactionInfoByID(1850) })		-- The Saberstalkers
-
-	-- Legion
-	table.insert(factions, { id = 1900, name = GetFactionInfoByID(1900) })		-- Court of Farondis
-	table.insert(factions, { id = 1883, name = GetFactionInfoByID(1883) })		-- Dreamweavers
-	table.insert(factions, { id = 1828, name = GetFactionInfoByID(1828) })		-- Highmountain Tribe
-	table.insert(factions, { id = 1948, name = GetFactionInfoByID(1948) })		-- Valarjar
-	table.insert(factions, { id = 1859, name = GetFactionInfoByID(1859) })		-- The Nightfallen
-	table.insert(factions, { id = 1894, name = GetFactionInfoByID(1894) })		-- The Wardens
-	table.insert(factions, { id = 2045, name = GetFactionInfoByID(2045) })		-- Armies of Legionfall
-	table.insert(factions, { id = 2165, name = GetFactionInfoByID(2165) })		-- Army of the Light
-	table.insert(factions, { id = 2170, name = GetFactionInfoByID(2170) })		-- Argussian Reach
-	table.insert(factions, { id = 1975, name = GetFactionInfoByID(1975) }) 	-- Conjurer Margoss
-	table.insert(factions, { id = 2097, name = GetFactionInfoByID(2097) }) 	-- Ilyssia of the Waters
-	table.insert(factions, { id = 2099, name = GetFactionInfoByID(2099) }) 	-- Akule Riverhorn
-	table.insert(factions, { id = 2101, name = GetFactionInfoByID(2101) }) 	-- Sha'leth
-	table.insert(factions, { id = 2100, name = GetFactionInfoByID(2100) }) 	-- Corbyn
-	table.insert(factions, { id = 2102, name = GetFactionInfoByID(2102) }) 	-- Impus
-	table.insert(factions, { id = 2098, name = GetFactionInfoByID(2098) }) 	-- Keeper Raynae
-	table.insert(factions, { id = 2135, name = GetFactionInfoByID(2135) }) 	-- Chromie
-
-	-- Battle for Azeroth
-	table.insert(factions, { id = 2159, name = GetFactionInfoByID(2159) })		-- A  - 7th Legion
-	table.insert(factions, { id = 2164, name = GetFactionInfoByID(2164) })		-- AH - Champions of Azeroth
-	table.insert(factions, { id = 2161, name = GetFactionInfoByID(2161) })		-- A  - Order of Embers	(alternate ID: 2264 but this seems unused on wowhead)
-	table.insert(factions, { id = 2160, name = GetFactionInfoByID(2160) })		-- A  - Proudmoore Admiralty (alternate ID: 2120 but this seems unused on wowhead)
-	table.insert(factions, { id = 2162, name = GetFactionInfoByID(2162) })		-- A  - Storm's Wake (alternate ID: 2265 but this seems unused on wowhead)
-	table.insert(factions, { id = 2156, name = GetFactionInfoByID(2156) })		-- H  - Talanji's Expedition
-	table.insert(factions, { id = 2157, name = GetFactionInfoByID(2157) })		-- H  - The Honorbound
-	table.insert(factions, { id = 2163, name = GetFactionInfoByID(2163) })		-- AH - Tortollan Seekers
-	table.insert(factions, { id = 2158, name = GetFactionInfoByID(2158) })		-- H  - Voldunai
-	table.insert(factions, { id = 2103, name = GetFactionInfoByID(2103) })		-- H  - Zandalari Empire
-	table.insert(factions, { id = 2400, name = BF["Waveblade Ankoan"] })		-- A  - Waveblade Ankoan
-	table.insert(factions, { id = 2373, name = BF["The Unshackled"] })			-- H  - The Unshackled
-	table.insert(factions, { id = 2391, name = GetFactionInfoByID(2391) })		-- Rustbolt Resistance
-	table.insert(factions, { id = 2415, name = GetFactionInfoByID(2415) })		-- 8.3 Rajani
-	table.insert(factions, { id = 2417, name = GetFactionInfoByID(2417) })		-- 8.3 Uldum Accord
-
-	-- Shadowlands (Source : https://www.wowhead.com/factions/shadowlands)
-	table.insert(factions, { id = 2407, name = GetFactionInfoByID(2407) or BF["The Ascended"] })			-- Zone: Bastion
-	table.insert(factions, { id = 2410, name = GetFactionInfoByID(2410) or BF["The Undying Army"]}) 		-- Zone : Maldraxxus
-	table.insert(factions, { id = 2465, name = GetFactionInfoByID(2465) or BF["The Wild Hunt"]})			-- Zone : Ardenweald
-	table.insert(factions, { id = 2413, name = GetFactionInfoByID(2413) or BF["Court of Harvesters"] })	-- Zone : Revendreth
-	table.insert(factions, { id = 2432, name = GetFactionInfoByID(2432) })     -- Ve'nari (The Maw)
-	table.insert(factions, { id = 2439, name = GetFactionInfoByID(2439) })     -- The Avowed (Halls of Attonement)
-	table.insert(factions, { id = 2464, name = GetFactionInfoByID(2464) })     -- Court of Night (Ardenweald)
-	table.insert(factions, { id = 2463, name = GetFactionInfoByID(2463) })     -- Marasimus (Ardenweald)
-	
-	table.insert(factions, { id = 2470, name = GetFactionInfoByID(2470) })     -- 9.1 Death's Advance
-	table.insert(factions, { id = 2472, name = GetFactionInfoByID(2472) })     -- 9.1 Archivist's Codex
-	table.insert(factions, { id = 2478, name = GetFactionInfoByID(2478) })     -- 9.2 The Enlightened
-	
-	-- Dragonflight
-	table.insert(factions, { id = 2507, name = GetFactionInfoByID(2507) })     -- Dragonscale Expedition
-	table.insert(factions, { id = 2503, name = GetFactionInfoByID(2503) })     -- Maruuk Centaur
-	table.insert(factions, { id = 2511, name = GetFactionInfoByID(2511) })     -- Iskaara Tuskarr
-	table.insert(factions, { id = 2510, name = GetFactionInfoByID(2510) })     -- Valdrakken Accord
-	
-	table.insert(factions, { id = 2526, name = GetFactionInfoByID(2526) })     -- Winterpelt Furbolg
-	table.insert(factions, { id = 2544, name = GetFactionInfoByID(2544) })     -- Artisan's Consortium - Dragon Isles Branch
-	table.insert(factions, { id = 2550, name = GetFactionInfoByID(2550) })     -- Cobalt Assembly
-	table.insert(factions, { id = 2517, name = GetFactionInfoByID(2517) })     -- Wrathion
-	table.insert(factions, { id = 2518, name = GetFactionInfoByID(2518) })     -- Sabellian
-	table.insert(factions, { id = 2553, name = GetFactionInfoByID(2553) })     -- Soridormi
-	table.insert(factions, { id = 2564, name = GetFactionInfoByID(2564) })     -- Loamm Niffen
-	table.insert(factions, { id = 2568, name = GetFactionInfoByID(2568) })     -- Glimmerogg Racer
-	table.insert(factions, { id = 2574, name = GetFactionInfoByID(2574) })     -- Dream Wardens	
-end
-
-
-local FactionUIDsRev = {}
-local FactionIdToName = {}
-
-for k, v in pairs(factions) do
-	if v.id and v.name then
-		FactionIdToName[v.id] = v.name
-		FactionUIDsRev[v.name] = k	-- ex : [BZ["Darnassus"]] = 1
+		-- Shadowlands (Source : https://www.wowhead.com/factions/shadowlands)
+		AddFaction(2407, BF["The Ascended"])			-- Zone: Bastion
+		AddFaction(2410, BF["The Undying Army"]) 		-- Zone : Maldraxxus
+		AddFaction(2465, BF["The Wild Hunt"])			-- Zone : Ardenweald
+		AddFaction(2413, BF["Court of Harvesters"])	-- Zone : Revendreth
+		AddFaction(2432)     -- Ve'nari (The Maw)
+		AddFaction(2439)     -- The Avowed (Halls of Attonement)
+		AddFaction(2464)     -- Court of Night (Ardenweald)
+		AddFaction(2463, BF["Marasmius"])     -- Marasmius (Ardenweald)
+		AddFaction(2470)     -- 9.1 Death's Advance
+		AddFaction(2472)     -- 9.1 Archivist's Codex
+		AddFaction(2478)     -- 9.2 The Enlightened
+		
+		-- Dragonflight
+		AddFaction(2507)     -- Dragonscale Expedition
+		AddFaction(2503)     -- Maruuk Centaur
+		AddFaction(2511)     -- Iskaara Tuskarr
+		AddFaction(2510)     -- Valdrakken Accord
+		AddFaction(2526)     -- Winterpelt Furbolg
+		AddFaction(2544)     -- Artisan's Consortium - Dragon Isles Branch
+		AddFaction(2550)     -- Cobalt Assembly
+		AddFaction(2517)     -- Wrathion
+		AddFaction(2518)     -- Sabellian
+		AddFaction(2553)     -- Soridormi
+		AddFaction(2564)     -- Loamm Niffen
+		AddFaction(2568)     -- Glimmerogg Racer
+		AddFaction(2574)     -- Dream Wardens	
 	end
 end
 
@@ -366,14 +312,14 @@ end
 local function GetLimits(earned)
 	-- return the bottom & top values of a given rep level based on the amount of earned rep
 	local top = 53000
-	local index = #BottomLevels
+	local index = #factionStandingThresholds
 	
-	while (earned < BottomLevels[index]) do
-		top = BottomLevels[index]
+	while earned < factionStandingThresholds[index] do
+		top = factionStandingThresholds[index]
 		index = index - 1
 	end
 	
-	return BottomLevels[index], top
+	return factionStandingThresholds[index], top
 end
 
 local function GetEarnedRep(character, faction)
@@ -382,104 +328,129 @@ local function GetEarnedRep(character, faction)
 		return character.guildRep
 	end
 	
-	local internalIndex = FactionUIDsRev[faction]
-	local factionID = factions[internalIndex] and factions[internalIndex].id
+	local factionID = factionNameToId[faction]
 	
 	-- also return the game's faction ID, the caller may need it
-	return character.Factions[internalIndex], factionID
+	return character.Factions[factionID], factionID
 end
 
 -- *** Scanning functions ***
-local currentGuildName
+local function ScanSingleFaction(factionID)
+	local factions = thisCharacter.Factions
 
-local function ScanReputations()
-	SaveHeaders()
-	local f = addon.ThisCharacter.Factions
-	wipe(f)
+	-- 1) Is it one of the new major factions since 10.0 ?
+	if C_Reputation.IsMajorFaction(factionID) then
+		local data = C_MajorFactions.GetMajorFactionData(factionID)
+		
+		factions[factionID] = FACTION_TYPE_MAJOR					-- bits 0-2 : faction type, 3 bits
+			+ bit64:LeftShift(data.renownLevel, 3)					-- bits 3-10 : renown level, 8 bits
+			+ bit64:LeftShift(data.renownReputationEarned, 11)	-- bits 11-26 : rep earned, 16 bits
+			+ bit64:LeftShift(data.renownLevelThreshold, 27)	-- bits 27+ : threshold
+		return
+	end	
 	
-	if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
-		-- Retail scan
-		for i = 1, GetNumFactions() do		-- 2nd pass, data collection
-			local name, _, _, _, _, earned, _, _, _, _, _, _, _, factionID = GetFactionInfo(i)
+	-- 2) Is it a friendship factions
+	local repInfo = C_GossipInfo.GetFriendshipReputation(factionID)
+
+	if repInfo and repInfo.friendshipFactionID > 0 then
+		local ranks = C_GossipInfo.GetFriendshipReputationRanks(factionID)
+		
+		-- Ex: Cobalt assembly, ID 2550, standing 205 / next threshold 300 => rank 1 / 5 (5 is not saved, maxLevel is identical for all)
+		factions[factionID] = FACTION_TYPE_FRIENDSHIP			-- bits 0-2 : faction type, 3 bits
+			+ bit64:LeftShift(ranks.currentLevel, 3)				-- bits 3-10 : currentLevel, 8 bits
+			+ bit64:LeftShift(repInfo.standing, 11)				-- bits 11-26 : rep earned, 16 bits
+			+ bit64:LeftShift(repInfo.nextThreshold or 0, 27)	-- bits 27+ : threshold
+		return
+	end
+
+	local value
+	local _, _, standing, _, _, earned = GetFactionInfoByID(factionID)
+	
+	-- 3) Is it a faction that supports paragons ?
+	if C_Reputation.IsFactionParagon(factionID) then
+		local currentValue, threshold, _, hasRewardPending = C_Reputation.GetFactionParagonInfo(factionID)
+		while (currentValue >= 10000) do
+			currentValue = currentValue - 10000
+		end
+	
+		if hasRewardPending then
+			currentValue = currentValue + 10000
+		end
+		
+		value = 43000 + currentValue
+	else
+		value = earned
+	end
+	
+	-- test negative factions : id 87 1104 2526 70 934 ..
+	local isNegative = 0
+	
+	if value < 0 then
+		value = value < 0 and -value				-- make the negative value positive again
+		isNegative = 1
+	end	
+		
+	factions[factionID] = FACTION_TYPE_NORMAL  	-- bits 0-2 : faction type, 3 bits
+		+ bit64:LeftShift(isNegative, 3)				-- bit 3 : isNegative
+		+ bit64:LeftShift(standing, 4)				-- bits 4-7 : standing (exalted, ..), 4 bits
+		+ bit64:LeftShift(value, 8)					-- bits 8+ : value
+end
+
+local function ScanAllFactions()
+	SaveHeaders()
+
+	if isRetail then
+		thisCharacter.guildName = GetGuildInfo("player")
+		
+		for i = 1, GetNumFactions() do
+			local factionID = select(14, GetFactionInfo(i))
 			
-			if FactionUIDsRev[name] then		-- is this a faction we're tracking ?
-				local repInfo = factionID and C_GossipInfo.GetFriendshipReputation(factionID)
-
-				-- From WoW's ReputationFrame.lua, give priority to friendship factions
-				if (repInfo and repInfo.friendshipFactionID > 0) then
-					
-					local ranks = C_GossipInfo.GetFriendshipReputationRanks(factionID)
-
-					-- Ex: Cobalt assembly, ID 2550, standing 205 / next threshold 300 => rank 1 / 5 (5 is not saved, maxLevel is identical for all)
-					f[FactionUIDsRev[name]] = format("%d,%d,%d", ranks.currentLevel, repInfo.standing, repInfo.nextThreshold)
-				
-				-- new in 3.0.2, headers may have rep, ex: alliance vanguard + horde expedition
-				-- 2021/08/20 do not test for positivity, earned rep may be negative !
-				elseif earned then
-					-- check paragon factions
-					if (C_Reputation.IsFactionParagon(factionID)) then
-						local currentValue, threshold, _, hasRewardPending = C_Reputation.GetFactionParagonInfo(factionID)
-						while (currentValue >= 10000) do
-							currentValue = currentValue - 10000
-						end
-					
-						if hasRewardPending then
-							currentValue = currentValue + 10000
-						end
-						f[FactionUIDsRev[name]] = 43000 + currentValue
-					else
-						f[FactionUIDsRev[name]] = earned
-					end
-
-					-- Special treatment for new major factions in 10.0
-					if C_Reputation.IsMajorFaction(factionID) then
-						local data = C_MajorFactions.GetMajorFactionData(factionID)
-						
-						f[FactionUIDsRev[name]] = format("%d,%d,%d", data.renownLevel, data.renownReputationEarned, data.renownLevelThreshold)
-					end
-				end
+			if factionID then
+				ScanSingleFaction(factionID)
 			end
 		end
-
 	else
 		-- Non-retail scan
-		for i = 1, GetNumFactions() do		-- 2nd pass, data collection
-			local name, _, _, _, _, earned, _, _, _, _, _, _, _, factionID = GetFactionInfo(i)
-			if earned then --(earned and earned > 0) then		-- new in 3.0.2, headers may have rep, ex: alliance vanguard + horde expedition
-				if FactionUIDsRev[name] then		-- is this a faction we're tracking ?
-					f[FactionUIDsRev[name]] = earned
-				end
-			end
-		end	
+		-- for i = 1, GetNumFactions() do
+			-- local name, _, _, _, _, earned, _, _, _, _, _, _, _, factionID = GetFactionInfo(i)
+			-- if earned then --(earned and earned > 0) then		-- new in 3.0.2, headers may have rep, ex: alliance vanguard + horde expedition
+				-- if FactionUIDsRev[name] then		-- is this a faction we're tracking ?
+					-- f[FactionUIDsRev[name]] = earned
+				-- end
+			-- end
+		-- end	
 	end
 
 	RestoreHeaders()
-	addon.ThisCharacter.lastUpdate = time()
+	thisCharacter.lastUpdate = time()
 end
 
 local function ScanGuildReputation()
+	-- guid faction id seems to be always 1168, was for me on both horder & alliance
+
 	SaveHeaders()
 	for i = 1, GetNumFactions() do		-- 2nd pass, data collection
-		local name, _, _, _, _, earned = GetFactionInfo(i)
+		local name, _, standing, _, _, earned = GetFactionInfo(i)
 		if name and name == currentGuildName then
-			addon.ThisCharacter.guildRep = earned
+			-- thisCharacter.guildRep = earned
+			
+			thisCharacter.guildRep = FACTION_TYPE_NORMAL  	-- bits 0-2 : faction type, 3 bits
+				-- + bit64:LeftShift(isNegative, 3)				-- bit 3 : isNegative => stays false (0) for guild rep
+				+ bit64:LeftShift(standing, 4)					-- bits 4-7 : standing (exalted, ..), 4 bits
+				+ bit64:LeftShift(earned, 8)						-- bits 8+ : value
 		end
 	end
 	RestoreHeaders()
 end
 
 -- *** Event Handlers ***
-local function OnPlayerAlive()
-	ScanReputations()
-end
-
 local function OnPlayerGuildUpdate()
 	-- at login this event is called between OnEnable and PLAYER_ALIVE, where GetGuildInfo returns a wrong value
 	-- however, the value returned here is correct
 	if IsInGuild() and not currentGuildName then		-- the event may be triggered multiple times, and GetGuildInfo may return incoherent values in subsequent calls, so only save if we have no value.
 		currentGuildName = GetGuildInfo("player")
-		if currentGuildName then	
-			addon.ThisCharacter.guildName = currentGuildName
+		if currentGuildName then
+			thisCharacter.guildName = currentGuildName
 			ScanGuildReputation()
 		end
 	end
@@ -492,22 +463,33 @@ local function OnFactionChange(event, messageType, faction, amount)
 		ScanGuildReputation()
 		return
 	end
-	
-	local bottom, top, earned = DataStore:GetRawReputationInfo(DataStore:GetCharacter(), faction)
-	if not earned then 	-- faction not in the db, scan all
-		ScanReputations()	
-		return 
-	end
-	
-	local newValue = earned + amount
-	if newValue >= top then	-- rep status increases (to revered, etc..)
-		ScanReputations()					-- so scan all
-	else
-		addon.ThisCharacter.Factions[FactionUIDsRev[faction]] = newValue
-		addon.ThisCharacter.lastUpdate = time()
-	end
 end
 
+local lastUpdateFaction = time()
+
+local function OnUpdateFaction()
+	--[[ 2024/01/28 : Tested on retail, killing a mob in booty bay gives 5 lines (4 increase + 1 decrease in rep)
+		for each line I had:
+		- CHAT_MSG_COMBAT_FACTION_CHANGE: which is useless, followed by:
+		- COMBAT_TEXT_UPDATE: which gave no extra information
+		
+		After the first 4 increases, I had 1 UPDATE_FACTION.
+		After the decrease, I also had 1 UPDATE_FACTION.
+		Overall, UPDATE_FACTION is called less often, I'll register this one to rescan factions.
+		
+		Nope, bad, UPDATE_FACTION is triggered when expanding/collapsing categories => deadlock
+		Only solution is to prevent subsequent events from triggering a scan.
+		=> No scan if event was triggered less than 3 seconds ago. Not nice, but Blizzard really doesn't help here..
+	--]]
+	
+	local now = time()
+	local elapsed = now - lastUpdateFaction
+	lastUpdateFaction = now
+	
+	if elapsed >= 3 then
+		ScanAllFactions()
+	end
+end
 
 -- ** Mixins **
 local function _GetReputationInfo_NonRetail(character, faction)
@@ -518,7 +500,7 @@ local function _GetReputationInfo_NonRetail(character, faction)
 	local bottom, top = GetLimits(earned)
 
 	-- ex: "Revered", 15400, 21000, 73%
-	currentLevel = BottomLevelNames[bottom]
+	currentLevel = factionStandingLabels[bottom]
 	repEarned = earned - bottom
 	nextLevel = top - bottom
 	rate = repEarned / nextLevel * 100
@@ -527,25 +509,34 @@ local function _GetReputationInfo_NonRetail(character, faction)
 end
 
 local function _GetReputationInfo_Retail(character, faction)
-	local earned, factionID = GetEarnedRep(character, faction)
-	if not earned then return end
+	local info, factionID = GetEarnedRep(character, faction)
+	if not info then return end
 
+	local factionType = bit64:GetBits(info, 0, 3)		-- bits 0-2 : faction type, 3 bits
 	local currentLevel, repEarned, nextLevel, rate
 	
 	-- earned reputation will be saved as a number for old/normal reputations.
-	if type(earned) == "number" then
+	if factionType == FACTION_TYPE_NORMAL then
+		local isNegative = bit64:TestBit(info, 3)			-- bit 3 : isNegative
+		local standing = bit64:GetBits(info, 4, 4)		-- bits 4-7 : standing (exalted, ..), 4 bits
+		local earned = bit64:RightShift(info, 8)			-- bits 8+ : value
+		earned = isNegative and -earned or earned
+	
 		local bottom, top = GetLimits(earned)
 	
 		-- ex: "Revered", 15400, 21000, 73%
-		currentLevel = BottomLevelNames[bottom]
+		currentLevel = _G["FACTION_STANDING_LABEL"..standing]
 		repEarned = earned - bottom
 		nextLevel = top - bottom
 	
 	-- For the new major factions introduced in Dragonflight, different processing is required
-	elseif type(earned) == "string" then
+	else
 		-- ex: "9,1252,2500" = level 9, 1252/2500
 		-- => 9, 1252, 2500, 50%
-		currentLevel, repEarned, nextLevel = strsplit(",", earned)
+		
+		currentLevel = bit64:GetBits(info, 3, 8)			-- bits 3-10 : level, 8 bits
+		repEarned = bit64:GetBits(info, 11, 16)			-- bits 11-26 : rep earned, 16 bits
+		nextLevel = bit64:RightShift(info, 27)			-- bits 27+ : threshold
 	end
 	
 	if nextLevel == "0" then
@@ -567,78 +558,59 @@ end
 local function _GetRawReputationInfo(character, faction)
 	-- same as GetReputationInfo, but returns raw values
 	
-	local earned = GetEarnedRep(character, faction)
-	if not earned then return end
+	local info = GetEarnedRep(character, faction)
+	if not info then return end
 
-	local bottom, top = GetLimits(earned)
-	return bottom, top, earned
-end
-
-local function _GetReputations(character)
-	return character.Factions
-end
-
-local function _GetGuildReputation(character)
-	return character.guildRep or 0
-end
-
-local function _GetReputationLevels()
-	return BottomLevels
-end
-
-local function _GetReputationLevelText(bottom)
-	return BottomLevelNames[bottom]
-end
-
-local function _GetFactionName(id)
-	return FactionIdToName[id]
-end
-
-local PublicMethods = {
-	GetRawReputationInfo = _GetRawReputationInfo,
-	GetReputations = _GetReputations,
-	GetReputationLevels = _GetReputationLevels,
-	GetReputationLevelText = _GetReputationLevelText,
-	GetFactionName = _GetFactionName,
-}
-
-if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
-	PublicMethods.GetGuildReputation = _GetGuildReputation
-	PublicMethods.GetReputationInfo = _GetReputationInfo_Retail
-else
-	PublicMethods.GetReputationInfo = _GetReputationInfo_NonRetail
-end
-
-function addon:OnInitialize()
-	addon.db = LibStub("AceDB-3.0"):New(addonName .. "DB", AddonDB_Defaults)
-
-	DataStore:RegisterModule(addonName, addon, PublicMethods)
-	DataStore:SetCharacterBasedMethod("GetReputationInfo")
-	DataStore:SetCharacterBasedMethod("GetRawReputationInfo")
-	DataStore:SetCharacterBasedMethod("GetReputations")
+	local factionType = bit64:GetBits(info, 0, 3)		-- bits 0-2 : faction type, 3 bits
 	
-	if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
-		DataStore:SetCharacterBasedMethod("GetGuildReputation")
+	if factionType == FACTION_TYPE_NORMAL then
+		local isNegative = bit64:TestBit(info, 3)			-- bit 3 : isNegative
+		local standing = bit64:GetBits(info, 4, 4)		-- bits 4-7 : standing (exalted, ..), 4 bits
+		local earned = bit64:RightShift(info, 8)			-- bits 8+ : value
+		earned = isNegative and -earned or earned
+	
+		local bottom, top = GetLimits(earned)
+		return bottom, top, earned
 	end
 end
 
-function addon:OnEnable()
-	addon:RegisterEvent("PLAYER_ALIVE", OnPlayerAlive)
-	addon:RegisterEvent("COMBAT_TEXT_UPDATE", OnFactionChange)
-	
-	if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
-		addon:RegisterEvent("PLAYER_GUILD_UPDATE", OnPlayerGuildUpdate)				-- for gkick, gquit, etc..
-	end
+local function _IsExaltedWithGuild(character)
+	return (character.guildRep and character.guildRep >= 42000)
 end
 
-function addon:OnDisable()
-	addon:UnregisterEvent("PLAYER_ALIVE")
-	addon:UnregisterEvent("COMBAT_TEXT_UPDATE")
+DataStore:OnAddonLoaded(addonName, function()
+	DataStore:RegisterModule({
+		addon = addon,
+		addonName = addonName,
+		characterTables = {
+			["DataStore_Reputations_Characters"] = {
+				GetReputations = function(character) return character.Factions end,
+				GetRawReputationInfo = _GetRawReputationInfo,
+				IsExaltedWithGuild = isRetail and _IsExaltedWithGuild,
+				GetGuildReputation = isRetail and function(character) return character.guildRep or 0 end,
+				GetReputationInfo = isRetail and _GetReputationInfo_Retail or _GetReputationInfo_NonRetail,
+			},
+		}
+	})
 	
-	if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
-		addon:UnregisterEvent("PLAYER_GUILD_UPDATE")
+	DataStore:RegisterMethod(addon, "GetReputationLevels", function() return factionStandingThresholds end)
+	DataStore:RegisterMethod(addon, "GetReputationLevelText", function(level) return factionStandingLabels[level] end)
+	DataStore:RegisterMethod(addon, "GetFactionName", function(id) return factions[id] end)
+	
+	thisCharacter = DataStore:GetCharacterDB("DataStore_Reputations_Characters", true)
+	thisCharacter.Factions = thisCharacter.Factions or {}
+end)
+
+DataStore:OnPlayerLogin(function()
+	-- UPDATE_FACTION will be triggered before PLAYER_ALIVE
+	addon:ListenTo("UPDATE_FACTION", OnUpdateFaction)
+	addon:ListenTo("COMBAT_TEXT_UPDATE", OnFactionChange)
+	
+	if isRetail then
+		addon:ListenTo("PLAYER_GUILD_UPDATE", OnPlayerGuildUpdate)				-- for gkick, gquit, etc..
 	end
-end
+end)
+
 
 -- *** Utility functions ***
 local PT = LibStub("LibPeriodicTable-3.1")
