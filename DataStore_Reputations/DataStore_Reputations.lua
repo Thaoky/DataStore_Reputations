@@ -29,7 +29,7 @@ local factionNameToId = {}
 do 
 	-- Keep the loading of factions in a narrow scope with do-end
 	local isVanilla = (WOW_PROJECT_ID == WOW_PROJECT_CLASSIC)
-	local isWotLK = (WOW_PROJECT_ID == WOW_PROJECT_WRATH_CLASSIC)
+	local isCata = (WOW_PROJECT_ID == WOW_PROJECT_CATACLYSM_CLASSIC)
 	local BF = LibStub("LibBabble-Faction-3.0"):GetUnstrictLookupTable()
 
 	local function AddFaction(id, text)
@@ -44,7 +44,7 @@ do
 
 	AddFaction(21, BF["Booty Bay"])
 	AddFaction(47, BF["Ironforge"])
-	AddFaction(54, isWotLK and BF["Gnomeregan Exiles"] or BF["Gnomeregan"])
+	AddFaction(54, isCata and BF["Gnomeregan Exiles"] or BF["Gnomeregan"])
 	AddFaction(59, BF["Thorium Brotherhood"])
 	AddFaction(68, BF["Undercity"])
 	AddFaction(69, BF["Darnassus"])
@@ -339,7 +339,7 @@ local function ScanSingleFaction(factionID)
 	local factions = thisCharacter.Factions
 
 	-- 1) Is it one of the new major factions since 10.0 ?
-	if C_Reputation.IsMajorFaction(factionID) then
+	if isRetail and C_Reputation.IsMajorFaction(factionID) then
 		local data = C_MajorFactions.GetMajorFactionData(factionID)
 		
 		factions[factionID] = FACTION_TYPE_MAJOR					-- bits 0-2 : faction type, 3 bits
@@ -399,26 +399,14 @@ end
 local function ScanAllFactions()
 	SaveHeaders()
 
-	if isRetail then
-		thisCharacter.guildName = GetGuildInfo("player")
+	thisCharacter.guildName = GetGuildInfo("player")
+
+	for i = 1, GetNumFactions() do
+		local factionID = select(14, GetFactionInfo(i))
 		
-		for i = 1, GetNumFactions() do
-			local factionID = select(14, GetFactionInfo(i))
-			
-			if factionID then
-				ScanSingleFaction(factionID)
-			end
+		if factionID then
+			ScanSingleFaction(factionID)
 		end
-	else
-		-- Non-retail scan
-		-- for i = 1, GetNumFactions() do
-			-- local name, _, _, _, _, earned, _, _, _, _, _, _, _, factionID = GetFactionInfo(i)
-			-- if earned then --(earned and earned > 0) then		-- new in 3.0.2, headers may have rep, ex: alliance vanguard + horde expedition
-				-- if FactionUIDsRev[name] then		-- is this a faction we're tracking ?
-					-- f[FactionUIDsRev[name]] = earned
-				-- end
-			-- end
-		-- end	
 	end
 
 	RestoreHeaders()
@@ -444,6 +432,11 @@ local function ScanGuildReputation()
 end
 
 -- *** Event Handlers ***
+local function OnPlayerAlive()
+	ScanAllFactions()
+	ScanGuildReputation()
+end
+
 local function OnPlayerGuildUpdate()
 	-- at login this event is called between OnEnable and PLAYER_ALIVE, where GetGuildInfo returns a wrong value
 	-- however, the value returned here is correct
@@ -539,7 +532,7 @@ local function _GetReputationInfo_Retail(character, faction)
 		nextLevel = bit64:RightShift(info, 27)			-- bits 27+ : threshold
 	end
 	
-	if nextLevel == "0" then
+	if nextLevel == 0 then
 		rate = 100
 	else
 		rate = repEarned / nextLevel * 100
@@ -608,6 +601,8 @@ DataStore:OnPlayerLogin(function()
 	
 	if isRetail then
 		addon:ListenTo("PLAYER_GUILD_UPDATE", OnPlayerGuildUpdate)				-- for gkick, gquit, etc..
+	else	
+		addon:ListenTo("PLAYER_ALIVE", OnPlayerAlive)
 	end
 end)
 
