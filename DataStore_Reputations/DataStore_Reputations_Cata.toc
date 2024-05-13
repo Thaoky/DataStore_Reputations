@@ -9,7 +9,7 @@
 ## SavedVariables: DataStore_Reputations_Characters
 ## X-Category: Interface Enhancements
 
-embeds_nonretail.xml
+Embeds_nonretail.xml
 
 Enum.lua
 DataStore_Reputations.lua

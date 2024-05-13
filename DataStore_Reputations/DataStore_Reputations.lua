@@ -539,7 +539,7 @@ local function _GetReputationInfo_Retail(character, faction)
 	end
 	
 	-- is it a major faction ? (4 Dragonflight renown)
-	local isMajorFaction = factionID and C_Reputation.IsMajorFaction(factionID)
+	local isMajorFaction = (factionID and isRetail) and C_Reputation.IsMajorFaction(factionID) or false
 	
 	-- is it a friendship faction ? 
 	local repInfo = factionID and C_GossipInfo.GetFriendshipReputation(factionID)	
@@ -579,9 +579,12 @@ DataStore:OnAddonLoaded(addonName, function()
 			["DataStore_Reputations_Characters"] = {
 				GetReputations = function(character) return character.Factions end,
 				GetRawReputationInfo = _GetRawReputationInfo,
-				IsExaltedWithGuild = isRetail and _IsExaltedWithGuild,
-				GetGuildReputation = isRetail and function(character) return character.guildRep or 0 end,
-				GetReputationInfo = isRetail and _GetReputationInfo_Retail or _GetReputationInfo_NonRetail,
+				-- IsExaltedWithGuild = isRetail and _IsExaltedWithGuild,
+				IsExaltedWithGuild = _IsExaltedWithGuild,
+				-- GetGuildReputation = isRetail and function(character) return character.guildRep or 0 end,
+				GetGuildReputation = function(character) return character.guildRep or 0 end,
+				-- GetReputationInfo = isRetail and _GetReputationInfo_Retail or _GetReputationInfo_NonRetail,
+				GetReputationInfo = _GetReputationInfo_Retail,
 			},
 		}
 	})
