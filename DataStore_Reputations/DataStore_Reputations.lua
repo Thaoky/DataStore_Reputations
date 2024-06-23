@@ -256,6 +256,8 @@ do
 		AddFaction(2564)     -- Loamm Niffen
 		AddFaction(2568)     -- Glimmerogg Racer
 		AddFaction(2574)     -- Dream Wardens	
+		AddFaction(2523)     -- Obsidian Warders Dracthyrs	
+		AddFaction(2524)     -- Dark Talons Dracthyrs	
 	end
 end
 
