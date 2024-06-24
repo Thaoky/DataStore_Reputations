@@ -127,12 +127,7 @@ do
 		AddFaction(67, BF["Horde"])
 		AddFaction(1134, BF["Gilneas"])
 		AddFaction(1133, BF["Bilgewater Cartel"])
-	end
-
-	if not isRetail then
-		AddFaction(471, BF["Wildhammer Clan"])
-	else
-
+		
 		-- cataclysm
 		AddFaction(1158, BF["Guardians of Hyjal"])
 		AddFaction(1135, BF["The Earthen Ring"])
@@ -143,6 +138,11 @@ do
 		AddFaction(1172, BF["Dragonmaw Clan"])
 		AddFaction(1178, BF["Hellscream's Reach"])
 		AddFaction(1204, BF["Avengers of Hyjal"])
+	end
+
+	if not isRetail then
+		AddFaction(471, BF["Wildhammer Clan"])
+	else
 
 		-- Mists of Pandaria
 		AddFaction(1277, BF["Chee Chee"])
@@ -256,8 +256,6 @@ do
 		AddFaction(2564)     -- Loamm Niffen
 		AddFaction(2568)     -- Glimmerogg Racer
 		AddFaction(2574)     -- Dream Wardens	
-		AddFaction(2523)     -- Obsidian Warders Dracthyrs	
-		AddFaction(2524)     -- Dark Talons Dracthyrs	
 	end
 end
 
