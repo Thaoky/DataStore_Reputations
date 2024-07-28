@@ -2,6 +2,10 @@ DataStore Changelog (dates in dd/mm/yyyy)
 ===================
 
 
+Version 2024.07.28 (28/07/2024)
+
+- Fixes for The War Within
+
 Version 2024.06.24 (24/06/2024)
 
 - Added the Cataclysm factions.

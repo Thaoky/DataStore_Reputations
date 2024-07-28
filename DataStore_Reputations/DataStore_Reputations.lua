@@ -8,9 +8,8 @@ local addonName, addon = ...
 local thisCharacter
 local currentGuildName
 
-local DataStore, select = DataStore, select
-local GetNumFactions, GetFactionInfo, ExpandFactionHeader, CollapseFactionHeader = GetNumFactions, GetFactionInfo, ExpandFactionHeader, CollapseFactionHeader
-local GetFactionInfoByID, IsInGuild, GetGuildInfo = GetFactionInfoByID, IsInGuild, GetGuildInfo
+local DataStore = DataStore
+local IsInGuild, GetGuildInfo = IsInGuild, GetGuildInfo
 local C_Reputation, C_MajorFactions, C_GossipInfo = C_Reputation, C_MajorFactions, C_GossipInfo
 local isRetail = (WOW_PROJECT_ID == WOW_PROJECT_MAINLINE)
 
@@ -23,6 +22,33 @@ local factionStandingLabels = enum.FactionStandingLabels
 local factionStandingThresholds = enum.FactionStandingThresholds
 local bit64 = LibStub("LibBit64")
 
+-- *** Common API ***
+local API_GetNumFactions = isRetail and C_Reputation.GetNumFactions or GetNumFactions
+local API_ExpandFactionHeader = isRetail and C_Reputation.ExpandFactionHeader or ExpandFactionHeader
+local API_CollapseFactionHeader = isRetail and C_Reputation.CollapseFactionHeader or CollapseFactionHeader
+local API_GetFactionInfo
+local API_GetFactionNameByID
+
+if isRetail then
+	API_GetFactionInfo = function(index) 
+			local info = C_Reputation.GetFactionDataByIndex(index)
+			return info.name, info.factionID, info.isHeader, info.isCollapsed, info.reaction, info.currentStanding
+		end
+	API_GetFactionNameByID = function(id)
+			local info = C_Reputation.GetFactionDataByID(id)
+			return info.name
+		end
+else
+	API_GetFactionInfo = function(index) 
+			local name, _, standing, _, _, earned, _,	_, isHeader, isCollapsed, _, _, _, factionID = GetFactionInfo(index)
+			return name, factionID, isHeader, isCollapsed, standing, earned
+		end
+	API_GetFactionNameByID = function(id)
+			return GetFactionInfoByID(id)
+		end
+end
+
+
 local factions = {}
 local factionNameToId = {}
 
@@ -33,7 +59,7 @@ do
 	local BF = LibStub("LibBabble-Faction-3.0"):GetUnstrictLookupTable()
 
 	local function AddFaction(id, text)
-		text = text or GetFactionInfoByID(id)
+		text = text or API_GetFactionNameByID(id)
 		factions[id] = text
 		
 		if not text then
@@ -256,23 +282,25 @@ do
 		AddFaction(2564)     -- Loamm Niffen
 		AddFaction(2568)     -- Glimmerogg Racer
 		AddFaction(2574)     -- Dream Wardens	
+		AddFaction(2523)     -- Dark Talons Dracthyrs
+		AddFaction(2524)     -- Obsidian Warders Dracthyrs	
 	end
 end
 
 -- *** Utility functions ***
-
 local headersState = {}
 local inactive = {}
 
 local function SaveHeaders()
 	local headerCount = 0		-- use a counter to avoid being bound to header names, which might not be unique.
 	
-	for i = GetNumFactions(), 1, -1 do		-- 1st pass, expand all categories
-		local name, _, _, _, _, _, _,	_, isHeader, isCollapsed = GetFactionInfo(i)
+	for i = API_GetNumFactions(), 1, -1 do		-- 1st pass, expand all categories
+		local _, _, isHeader, isCollapsed = API_GetFactionInfo(i)
+		
 		if isHeader then
 			headerCount = headerCount + 1
 			if isCollapsed then
-				ExpandFactionHeader(i)
+				API_ExpandFactionHeader(i)
 				headersState[headerCount] = true
 			end
 		end
@@ -281,7 +309,7 @@ local function SaveHeaders()
 	-- code disabled until I can find the other addon that conflicts with this and slows down the machine.
 	
 	-- If a header faction, like alliance or horde, has all child factions set to inactive, it will not be visible, so activate it, and deactivate it after the scan (thanks Zaphon for this)
-	-- for i = GetNumFactions(), 1, -1 do
+	-- for i = API_GetNumFactions(), 1, -1 do
 		-- if IsFactionInactive(i) then
 			-- local name = GetFactionInfo(i)
 			-- inactive[name] = true
@@ -292,17 +320,17 @@ end
 
 local function RestoreHeaders()
 	local headerCount = 0
-	for i = GetNumFactions(), 1, -1 do
-		local name, _, _, _, _, _, _,	_, isHeader = GetFactionInfo(i)
+	for i = API_GetNumFactions(), 1, -1 do
+		local _, _, isHeader, isCollapsed = API_GetFactionInfo(i)
 		
-		-- if inactive[name] then
+		-- if inactive[info.name] then
 			-- SetFactionInactive(i)
 		-- end
 		
 		if isHeader then
 			headerCount = headerCount + 1
 			if headersState[headerCount] then
-				CollapseFactionHeader(i)
+				API_CollapseFactionHeader(i)
 			end
 		end
 	end
@@ -335,7 +363,9 @@ local function GetEarnedRep(character, faction)
 end
 
 -- *** Scanning functions ***
-local function ScanSingleFaction(factionID)
+local function ScanSingleFaction(factionID, index)
+	if not factionID or factionID == 0 then return end
+	
 	local factions = thisCharacter.Factions
 
 	-- 1) Is it one of the new major factions since 10.0 ?
@@ -364,7 +394,14 @@ local function ScanSingleFaction(factionID)
 	end
 
 	local value
-	local _, _, standing, _, _, earned = GetFactionInfoByID(factionID)
+	local _, _, _, _, standing, earned = API_GetFactionInfo(index)
+	
+	-- local info = C_Reputation.GetFactionDataByID(factionID)
+	-- if not info then
+		-- print("no info for id : " .. factionID)
+	-- end
+	-- local earned = info.currentStanding
+	-- local standing = info.reaction
 	
 	-- 3) Is it a faction that supports paragons ?
 	if C_Reputation.IsFactionParagon(factionID) then
@@ -401,11 +438,11 @@ local function ScanAllFactions()
 
 	thisCharacter.guildName = GetGuildInfo("player")
 
-	for i = 1, GetNumFactions() do
-		local factionID = select(14, GetFactionInfo(i))
+	for i = 1, API_GetNumFactions() do
+		local factionID = select(2, API_GetFactionInfo(i))
 		
 		if factionID then
-			ScanSingleFaction(factionID)
+			ScanSingleFaction(factionID, i)		-- pass the index for cata.
 		end
 	end
 
@@ -414,11 +451,12 @@ local function ScanAllFactions()
 end
 
 local function ScanGuildReputation()
-	-- guid faction id seems to be always 1168, was for me on both horder & alliance
+	-- guid faction id seems to be always 1168, was for me on both horde & alliance
 
 	SaveHeaders()
-	for i = 1, GetNumFactions() do		-- 2nd pass, data collection
-		local name, _, standing, _, _, earned = GetFactionInfo(i)
+	for i = 1, API_GetNumFactions() do		-- 2nd pass, data collection
+		local name, _, _, _, standing, earned = API_GetFactionInfo(i)
+
 		if name and name == currentGuildName then
 			-- thisCharacter.guildRep = earned
 			
