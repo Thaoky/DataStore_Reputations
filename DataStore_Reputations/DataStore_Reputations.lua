@@ -32,11 +32,15 @@ local API_GetFactionNameByID
 if isRetail then
 	API_GetFactionInfo = function(index) 
 			local info = C_Reputation.GetFactionDataByIndex(index)
-			return info.name, info.factionID, info.isHeader, info.isCollapsed, info.reaction, info.currentStanding
+			if info then
+				return info.name, info.factionID, info.isHeader, info.isCollapsed, info.reaction, info.currentStanding
+			end
 		end
 	API_GetFactionNameByID = function(id)
 			local info = C_Reputation.GetFactionDataByID(id)
-			return info.name
+			if info then
+				return info.name
+			end
 		end
 else
 	API_GetFactionInfo = function(index) 
@@ -284,6 +288,16 @@ do
 		AddFaction(2574)     -- Dream Wardens	
 		AddFaction(2523)     -- Dark Talons Dracthyrs
 		AddFaction(2524)     -- Obsidian Warders Dracthyrs	
+		
+		-- The War Within
+		AddFaction(2590)     -- Council of Dornogal
+		AddFaction(2594)     -- The Assembly of the Deeps
+		AddFaction(2570)     -- Hallowfall Arathi
+		AddFaction(2600)     -- The Severed Threads
+		AddFaction(2605)     -- 	The General
+		AddFaction(2607)     -- 	The Vizier
+		AddFaction(2601)     -- 	The Weaver
+		AddFaction(2640)     -- Brann Bronzebeard
 	end
 end
 

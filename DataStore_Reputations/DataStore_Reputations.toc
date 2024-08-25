@@ -4,7 +4,7 @@
 
 ## Notes: Stores information about character reputation levels
 ## Author: Thaoky (EU-Marécages de Zangar)
-## Version: 2024.08.14
+## Version: 2024.08.25
 ## Dependencies: DataStore
 ## SavedVariables: DataStore_Reputations_Characters
 ## X-Category: Interface Enhancements
