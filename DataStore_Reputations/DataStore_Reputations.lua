@@ -623,7 +623,7 @@ local function _IsExaltedWithGuild(character)
 	return (character.guildRep and character.guildRep >= 42000)
 end
 
-DataStore:OnAddonLoaded(addonName, function()
+AddonFactory:OnAddonLoaded(addonName, function()
 	DataStore:RegisterModule({
 		addon = addon,
 		addonName = addonName,
@@ -649,7 +649,7 @@ DataStore:OnAddonLoaded(addonName, function()
 	thisCharacter.Factions = thisCharacter.Factions or {}
 end)
 
-DataStore:OnPlayerLogin(function()
+AddonFactory:OnPlayerLogin(function()
 	-- UPDATE_FACTION will be triggered before PLAYER_ALIVE
 	addon:ListenTo("UPDATE_FACTION", OnUpdateFaction)
 	addon:ListenTo("COMBAT_TEXT_UPDATE", OnFactionChange)
