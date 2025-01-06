@@ -418,7 +418,7 @@ local function ScanSingleFaction(factionID, index)
 	-- local standing = info.reaction
 	
 	-- 3) Is it a faction that supports paragons ?
-	if C_Reputation.IsFactionParagon(factionID) then
+	if _G["C_Reputation.IsFactionParagon"] and C_Reputation.IsFactionParagon(factionID) then
 		local currentValue, threshold, _, hasRewardPending = C_Reputation.GetFactionParagonInfo(factionID)
 		while (currentValue >= 10000) do
 			currentValue = currentValue - 10000
