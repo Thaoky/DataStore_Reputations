@@ -298,6 +298,14 @@ do
 		AddFaction(2607)     -- 	The Vizier
 		AddFaction(2601)     -- 	The Weaver
 		AddFaction(2640)     -- Brann Bronzebeard
+		
+		-- The War Within 11.1
+		AddFaction(2673)     -- Bilgewater Cartel
+		AddFaction(2675)     -- Blackwater Cartel
+		AddFaction(2669)     -- Darkfuse Solutions
+		AddFaction(2685)     -- Gallagio Loyalty Rewards Club
+		AddFaction(2677)     -- Steamwheedle Cartel
+		AddFaction(2671)     -- Venture Company
 	end
 end
 
