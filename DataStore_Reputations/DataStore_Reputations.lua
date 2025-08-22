@@ -306,6 +306,11 @@ do
 		AddFaction(2685)     -- Gallagio Loyalty Rewards Club
 		AddFaction(2677)     -- Steamwheedle Cartel
 		AddFaction(2671)     -- Venture Company
+		
+		-- The War Within 11.2
+		AddFaction(2658)     -- The K'aresh Trust
+		
+		
 	end
 end
 
@@ -426,7 +431,7 @@ local function ScanSingleFaction(factionID, index)
 	-- local standing = info.reaction
 	
 	-- 3) Is it a faction that supports paragons ?
-	if C_Reputation.IsFactionParagon(factionID) then
+	if _G["C_Reputation.IsFactionParagon"] and C_Reputation.IsFactionParagon(factionID) then
 		local currentValue, threshold, _, hasRewardPending = C_Reputation.GetFactionParagonInfo(factionID)
 		while (currentValue >= 10000) do
 			currentValue = currentValue - 10000
