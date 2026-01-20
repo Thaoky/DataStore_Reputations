@@ -7,6 +7,8 @@ local BF = LibStub("LibBabble-Faction-3.0"):GetUnstrictLookupTable()
 
 -- Low threshold of each reputation level
 enum.FactionStandingThresholds = { -42000, -6000, -3000, 0, 3000, 9000, 21000, 42000, 43000 }
+enum.FactionStandingXPPerLevel = { 36000, 3000, 3000, 3000, 6000, 12000, 21000, 1000 }
+
 enum.FriendshipStandingThresholds = { 0, 8400, 16800, 25200, 33600, 42000 }
 
 -- Name of the various reputation levels
