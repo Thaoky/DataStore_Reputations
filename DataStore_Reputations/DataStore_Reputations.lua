@@ -19,7 +19,9 @@ local FACTION_TYPE_MAJOR = 2				-- Major faction, save : level, earned, threshol
 
 local enum = DataStore.Enum
 local factionStandingLabels = enum.FactionStandingLabels
+local friendshipStandingLabels = enum.FriendshipStandingLabels
 local factionStandingThresholds = enum.FactionStandingThresholds
+local friendshipStandingThresholds = enum.FriendshipStandingThresholds
 local bit64 = LibStub("LibBit64")
 
 -- *** Common API ***
@@ -68,8 +70,13 @@ do
 		
 		if not text then
 			print("no value for id : " .. id)
+		-- else print("Added", id, text) --debug
 		end
 		factionNameToId[text] = id
+	end
+	local function RemoveFaction(id)
+		factionNameToId[factions[id]] = nil
+		factions[id] = nil
 	end
 
 	AddFaction(21, BF["Booty Bay"])
@@ -89,6 +96,7 @@ do
 	AddFaction(349, BF["Ravenholdt"])
 	AddFaction(369, BF["Gadgetzan"])
 	AddFaction(470, BF["Ratchet"])
+	AddFaction(471, BF["Wildhammer Clan"]) -- Original faction (removed in TBC)
 	AddFaction(509, BF["The League of Arathor"])
 	AddFaction(510, BF["The Defilers"])
 	AddFaction(529, BF["Argent Dawn"])
@@ -106,11 +114,12 @@ do
 	AddFaction(909, BF["Darkmoon Faire"])
 	AddFaction(910, BF["Brood of Nozdormu"])
 
-	if not isVanilla then
+	if LE_EXPANSION_LEVEL_CURRENT >= LE_EXPANSION_BURNING_CRUSADE then
+		RemoveFaction(471)
+
 		AddFaction(911, BF["Silvermoon City"])
 		AddFaction(922, BF["Tranquillien"])
 		AddFaction(930, BF["Exodar"])
-		-- LK & later
 
 		-- The Burning Crusade
 		AddFaction(1012, BF["Ashtongue Deathsworn"])
@@ -132,7 +141,9 @@ do
 		AddFaction(989, BF["Keepers of Time"])
 		AddFaction(990, BF["The Scale of the Sands"])
 		AddFaction(967, BF["The Violet Eye"])
+	end
 
+	if LE_EXPANSION_LEVEL_CURRENT >= LE_EXPANSION_WRATH_OF_THE_LICH_KING then
 		-- Wrath of the Lich King
 		AddFaction(1106, BF["Argent Crusade"])
 		AddFaction(1090, BF["Kirin Tor"])
@@ -157,8 +168,10 @@ do
 		AddFaction(67, BF["Horde"])
 		AddFaction(1134, BF["Gilneas"])
 		AddFaction(1133, BF["Bilgewater Cartel"])
-		
-		-- cataclysm
+	end
+
+	if LE_EXPANSION_LEVEL_CURRENT >= LE_EXPANSION_CATACLYSM then
+		-- Cataclysm
 		AddFaction(1158, BF["Guardians of Hyjal"])
 		AddFaction(1135, BF["The Earthen Ring"])
 		AddFaction(1171, BF["Therazane"])
@@ -170,10 +183,14 @@ do
 		AddFaction(1204, BF["Avengers of Hyjal"])
 	end
 
+	-- Not sure if this is needed
+	--[[
 	if not isRetail then
 		AddFaction(471, BF["Wildhammer Clan"])
-	else
+	end
+	--]]
 
+	if LE_EXPANSION_LEVEL_CURRENT >= LE_EXPANSION_MISTS_OF_PANDARIA then
 		-- Mists of Pandaria
 		AddFaction(1277, BF["Chee Chee"])
 		AddFaction(1275, BF["Ella"])
@@ -208,7 +225,9 @@ do
 		AddFaction(1435, BF["Shado-Pan Assault"])
 		AddFaction(1440, BF["Darkspear Rebellion"])
 		AddFaction(1492, BF["Emperor Shaohao"])
+	end
 
+	if LE_EXPANSION_LEVEL_CURRENT >= LE_EXPANSION_WARLORDS_OF_DRAENOR then
 		-- Warlords of Draenor
 		AddFaction(1515)		-- Arrakoa Outcasts
 		AddFaction(1731)		-- Council of Exarchs
@@ -222,7 +241,9 @@ do
 		AddFaction(1848)		-- Vol'jin's Headhunters
 		AddFaction(1849)		-- Order of the Awakened
 		AddFaction(1850)		-- The Saberstalkers
+	end
 
+	if LE_EXPANSION_LEVEL_CURRENT >= LE_EXPANSION_LEGION then
 		-- Legion
 		AddFaction(1900)		-- Court of Farondis
 		AddFaction(1883)		-- Dreamweavers
@@ -241,7 +262,9 @@ do
 		AddFaction(2102) 		-- Impus
 		AddFaction(2098) 		-- Keeper Raynae
 		AddFaction(2135) 		-- Chromie
+	end
 
+	if LE_EXPANSION_LEVEL_CURRENT >= LE_EXPANSION_BATTLE_FOR_AZEROTH then
 		-- Battle for Azeroth
 		AddFaction(2159)		-- A  - 7th Legion
 		AddFaction(2164)		-- AH - Champions of Azeroth
@@ -258,7 +281,9 @@ do
 		AddFaction(2391)		-- Rustbolt Resistance
 		AddFaction(2415)		-- 8.3 Rajani
 		AddFaction(2417)		-- 8.3 Uldum Accord
+	end
 
+	if LE_EXPANSION_LEVEL_CURRENT >= LE_EXPANSION_SHADOWLANDS then
 		-- Shadowlands (Source : https://www.wowhead.com/factions/shadowlands)
 		AddFaction(2407, BF["The Ascended"])			-- Zone: Bastion
 		AddFaction(2410, BF["The Undying Army"]) 		-- Zone : Maldraxxus
@@ -271,7 +296,9 @@ do
 		AddFaction(2470)     -- 9.1 Death's Advance
 		AddFaction(2472)     -- 9.1 Archivist's Codex
 		AddFaction(2478)     -- 9.2 The Enlightened
-		
+	end
+
+	if LE_EXPANSION_LEVEL_CURRENT >= LE_EXPANSION_DRAGONFLIGHT then
 		-- Dragonflight
 		AddFaction(2507)     -- Dragonscale Expedition
 		AddFaction(2503)     -- Maruuk Centaur
@@ -287,8 +314,10 @@ do
 		AddFaction(2568)     -- Glimmerogg Racer
 		AddFaction(2574)     -- Dream Wardens	
 		AddFaction(2523)     -- Dark Talons Dracthyrs
-		AddFaction(2524)     -- Obsidian Warders Dracthyrs	
+		AddFaction(2524)     -- Obsidian Warders Dracthyrs
+	end
 		
+	if LE_EXPANSION_LEVEL_CURRENT >= LE_EXPANSION_WAR_WITHIN then
 		-- The War Within
 		AddFaction(2590)     -- Council of Dornogal
 		AddFaction(2594)     -- The Assembly of the Deeps
@@ -298,7 +327,7 @@ do
 		AddFaction(2607)     -- 	The Vizier
 		AddFaction(2601)     -- 	The Weaver
 		AddFaction(2640)     -- Brann Bronzebeard
-		
+
 		-- The War Within 11.1
 		AddFaction(2673)     -- Bilgewater Cartel
 		AddFaction(2675)     -- Blackwater Cartel
@@ -307,12 +336,10 @@ do
 		AddFaction(2677)     -- Steamwheedle Cartel
 		AddFaction(2671)     -- Venture Company
 		AddFaction(2688)     -- Flame's Radiance
-		
+
 		-- The War Within 11.2
 		AddFaction(2658)     -- The K'aresh Trust
 		AddFaction(2736)     -- Manaforge Vandals
-		
-		
 	end
 end
 
@@ -366,6 +393,24 @@ local function RestoreHeaders()
 	wipe(headersState)
 end
 
+local function GetLimits(earned, friendship)
+	-- return the bottom & top values of a given rep level based on the amount of earned rep
+	local thresholds = factionStandingThresholds
+	if friendship then
+		thresholds = friendshipStandingThresholds
+	end
+
+	local top = thresholds[#thresholds] + 1000
+	local index = #thresholds
+
+	while earned < thresholds[index] do
+		top = thresholds[index]
+		index = index - 1
+	end
+	
+	return thresholds[index], top
+end
+--[[
 local function GetLimits(earned)
 	-- return the bottom & top values of a given rep level based on the amount of earned rep
 	local top = 53000
@@ -378,6 +423,7 @@ local function GetLimits(earned)
 	
 	return factionStandingThresholds[index], top
 end
+]]
 
 local function GetEarnedRep(character, faction)
 	-- Return guild reputation
@@ -570,10 +616,13 @@ end
 
 local function _GetReputationInfo_Retail(character, faction)
 	local info, factionID = GetEarnedRep(character, faction)
-	if not info then return end
+	if not info then
+		return nil, nil, nil, nil, nil, nil, factionID, nil
+	end
 
 	local factionType = bit64:GetBits(info, 0, 3)		-- bits 0-2 : faction type, 3 bits
-	local currentLevel, repEarned, nextLevel, rate
+	local currentLevel, repEarned, nextLevel, rate, standing
+	local isFriendshipFaction = factionType == FACTION_TYPE_FRIENDSHIP
 	
 	-- earned reputation will be saved as a number for old/normal reputations.
 	if factionType == FACTION_TYPE_NORMAL then
@@ -588,9 +637,13 @@ local function _GetReputationInfo_Retail(character, faction)
 		currentLevel = _G["FACTION_STANDING_LABEL"..standing]
 		repEarned = earned - bottom
 		nextLevel = top - bottom
-	
-	-- For the new major factions introduced in Dragonflight, different processing is required
+	elseif factionType == FACTION_TYPE_FRIENDSHIP then
+		standing = bit64:GetBits(info, 4, 4)		-- bits 4-7 : standing (exalted, ..), 4 bits
+		currentLevel = friendshipStandingLabels[friendshipStandingThresholds[standing+1]]
+		repEarned = bit64:GetBits(info, 11, 16)			-- bits 11-26 : rep earned, 16 bits
+		nextLevel = bit64:RightShift(info, 27)			-- bits 27+ : threshold
 	else
+		-- For the new major factions introduced in Dragonflight, different processing is required
 		-- ex: "9,1252,2500" = level 9, 1252/2500
 		-- => 9, 1252, 2500, 50%
 		
@@ -607,12 +660,8 @@ local function _GetReputationInfo_Retail(character, faction)
 	
 	-- is it a major faction ? (4 Dragonflight renown)
 	local isMajorFaction = (factionID and isRetail) and C_Reputation.IsMajorFaction(factionID) or false
-	
-	-- is it a friendship faction ? 
-	local repInfo = factionID and C_GossipInfo.GetFriendshipReputation(factionID)	
-	local isFrienshipFaction = (repInfo and repInfo.friendshipFactionID > 0) 
-	
-	return currentLevel, repEarned, nextLevel, rate, isMajorFaction, isFrienshipFaction, factionID
+
+	return currentLevel, repEarned, nextLevel, rate, isMajorFaction, isFriendshipFaction, factionID, standing
 end
 
 local function _GetRawReputationInfo(character, faction)
@@ -653,7 +702,6 @@ AddonFactory:OnAddonLoaded(addonName, function()
 				-- IsExaltedWithGuild = isRetail and _IsExaltedWithGuild,
 				IsExaltedWithGuild = _IsExaltedWithGuild,
 				-- GetGuildReputation = isRetail and function(character) return character.guildRep or 0 end,
-				-- GetGuildReputation = function(character) return character.guildRep or 0 end,
 				GetGuildReputation = _GetGuildReputation,
 				-- GetReputationInfo = isRetail and _GetReputationInfo_Retail or _GetReputationInfo_NonRetail,
 				GetReputationInfo = _GetReputationInfo_Retail,
@@ -663,6 +711,7 @@ AddonFactory:OnAddonLoaded(addonName, function()
 	
 	DataStore:RegisterMethod(addon, "GetReputationLevels", function() return factionStandingThresholds end)
 	DataStore:RegisterMethod(addon, "GetReputationLevelText", function(level) return factionStandingLabels[level] end)
+	DataStore:RegisterMethod(addon, "GetFriendshipLevelText", function(level) return friendshipStandingLabels[level] end)
 	DataStore:RegisterMethod(addon, "GetFactionName", function(id) return factions[id] end)
 	
 	thisCharacter = DataStore:GetCharacterDB("DataStore_Reputations_Characters", true)
@@ -695,3 +744,4 @@ function addon:GetSource(searchedID)
 		return faction, _G["FACTION_STANDING_LABEL"..level]
 	end
 end
+

@@ -2,12 +2,14 @@
 Reputations-related enumerations
 --]]
 local enum = DataStore.Enum
--- local BF = LibStub("LibBabble-Faction-3.0"):GetUnstrictLookupTable()
+local BF = LibStub("LibBabble-Faction-3.0"):GetUnstrictLookupTable()
 
 
 -- Low threshold of each reputation level
 enum.FactionStandingThresholds = { -42000, -6000, -3000, 0, 3000, 9000, 21000, 42000, 43000 }
 enum.FactionStandingXPPerLevel = { 36000, 3000, 3000, 3000, 6000, 12000, 21000, 1000 }
+
+enum.FriendshipStandingThresholds = { 0, 8400, 16800, 25200, 33600, 42000 }
 
 -- Name of the various reputation levels
 enum.FactionStandingLabels = {
@@ -22,6 +24,14 @@ enum.FactionStandingLabels = {
 	[43000] = "Paragon",							-- "Paragon"
 }
 
+enum.FriendshipStandingLabels = {
+	[0] = BF["Stranger"],
+	[8400] = BF["Acquaintance"],
+	[16800] = BF["Buddy"],
+	[25200] = BF["Friend"],
+	[33600] = BF["Good Friend"],
+	[42000] = BF["Best Friend"],
+}
 
 -- CHECK : https://www.curseforge.com/wow/addons/libbabble-faction-3-0/files
 
@@ -58,3 +68,4 @@ enum.FactionStandingLabels = {
 		-- },
 	-- }
 -- }
+

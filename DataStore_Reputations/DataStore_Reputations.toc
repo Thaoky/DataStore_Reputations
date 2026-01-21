@@ -1,4 +1,4 @@
-## Interface: 120000
+## Interface: 120000, 20505
 ## Title: DataStore_Reputations
 ## IconTexture: Interface\Icons\garrison_building_storehouse
 
@@ -25,3 +25,4 @@ Embeds_retail.xml
 
 Enum.lua
 DataStore_Reputations.lua
+
