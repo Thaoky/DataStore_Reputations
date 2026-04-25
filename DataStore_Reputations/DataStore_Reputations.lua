@@ -462,21 +462,43 @@ local function ScanSingleFaction(factionID, index)
 		+ bit64:LeftShift(value, 8)					-- bits 8+ : value
 end
 
+-- Chunk the main faction loop across frames. On 12.0+ retail there are
+-- 400+ factions when categories are expanded by SaveHeaders, and each
+-- ScanSingleFaction makes 4-5 API calls (IsMajorFaction, GetFriendshipReputation,
+-- GetFriendshipReputationRanks, IsFactionParagon, GetFactionParagonInfo).
+-- Doing all of that in one synchronous pass exceeds WoW's script budget.
+local FACTIONS_PER_FRAME = 60
+local factionScanGen = 0
+
 local function ScanAllFactions()
 	SaveHeaders()
 
 	thisCharacter.guildName = GetGuildInfo("player")
 
-	for i = 1, API_GetNumFactions() do
-		local factionID = select(2, API_GetFactionInfo(i))
-		
-		if factionID then
-			ScanSingleFaction(factionID, i)		-- pass the index for cata.
+	factionScanGen = factionScanGen + 1
+	local myGen = factionScanGen
+	local total = API_GetNumFactions()
+	local i = 1
+
+	local function ProcessBatch()
+		if myGen ~= factionScanGen then return end		-- superseded by a newer scan
+		local endIdx = math.min(i + FACTIONS_PER_FRAME - 1, total)
+		while i <= endIdx do
+			local factionID = select(2, API_GetFactionInfo(i))
+			if factionID then
+				ScanSingleFaction(factionID, i)		-- pass the index for cata.
+			end
+			i = i + 1
+		end
+		if i <= total then
+			C_Timer.After(0, ProcessBatch)
+		else
+			RestoreHeaders()
+			thisCharacter.lastUpdate = time()
 		end
 	end
 
-	RestoreHeaders()
-	thisCharacter.lastUpdate = time()
+	ProcessBatch()
 end
 
 local function ScanGuildReputation()
