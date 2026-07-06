@@ -1,10 +1,10 @@
-## Interface: 50503
+## Interface: 50504
 ## Title: DataStore_Reputations
 ## IconTexture: Interface\Icons\garrison_building_storehouse
 
 ## Notes: Stores information about character reputation levels
 ## Author: Thaoky (EU-Marécages de Zangar)
-## Version: 2025.09.25
+## Version: 2026.07.06
 ## Dependencies: AddonFactory, DataStore
 ## SavedVariables: DataStore_Reputations_Characters
 ## X-Category: Interface Enhancements
@@ -25,4 +25,3 @@ Embeds_nonretail.xml
 
 Enum.lua
 DataStore_Reputations.lua
-
