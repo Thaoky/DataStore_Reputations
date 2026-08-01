@@ -66,17 +66,20 @@ do
 
 	local function AddFaction(id, text)
 		text = text or API_GetFactionNameByID(id)
+
+		-- a faction that does not exist in this version of the game has no name here.
+		-- Registering it anyway would index factionNameToId with nil, which errors out of this
+		-- whole block and leaves every faction declared below it unregistered.
+		if not text then return end
+
 		factions[id] = text
-		
-		if not text then
-			print("no value for id : " .. id)
-		-- else print("Added", id, text) --debug
-		end
 		factionNameToId[text] = id
 	end
 	local function RemoveFaction(id)
-		factionNameToId[factions[id]] = nil
-		factions[id] = nil
+		if factions[id] then
+			factionNameToId[factions[id]] = nil
+			factions[id] = nil
+		end
 	end
 
 	AddFaction(21, BF["Booty Bay"])
