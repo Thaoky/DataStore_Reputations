@@ -33,13 +33,13 @@ local API_GetFactionNameByID
 
 if isRetail then
 	API_GetFactionInfo = function(index) 
-			local info = C_Reputation.GetFactionDataByIndex(index)
+			local info = nil; if C_Reputation and C_Reputation.GetFactionDataByIndex then local ok, data = pcall(C_Reputation.GetFactionDataByIndex, index); if ok then info = data end end
 			if info then
 				return info.name, info.factionID, info.isHeader, info.isCollapsed, info.reaction, info.currentStanding
 			end
 		end
 	API_GetFactionNameByID = function(id)
-			local info = C_Reputation.GetFactionDataByID(id)
+			local info = nil; if C_Reputation and C_Reputation.GetFactionDataByID then local ok, data = pcall(C_Reputation.GetFactionDataByID, id); if ok then info = data end end
 			if info then
 				return info.name
 			end
@@ -445,7 +445,7 @@ local function ScanSingleFaction(factionID, index)
 
 	-- 1) Is it one of the new major factions since 10.0 ?
 	if isRetail and C_Reputation.IsMajorFaction(factionID) then
-		local data = C_MajorFactions.GetMajorFactionData(factionID)
+		local data = nil; if C_MajorFactions and C_MajorFactions.GetMajorFactionData then local ok, d = pcall(C_MajorFactions.GetMajorFactionData, factionID); if ok then data = d end end
 		
 		factions[factionID] = FACTION_TYPE_MAJOR					-- bits 0-2 : faction type, 3 bits
 			+ bit64:LeftShift(data.renownLevel, 3)					-- bits 3-10 : renown level, 8 bits
@@ -455,7 +455,7 @@ local function ScanSingleFaction(factionID, index)
 	end	
 	
 	-- 2) Is it a friendship factions
-	local repInfo = C_GossipInfo.GetFriendshipReputation(factionID)
+	local repInfo = nil; if C_GossipInfo and C_GossipInfo.GetFriendshipReputation then local ok, r = pcall(C_GossipInfo.GetFriendshipReputation, factionID); if ok then repInfo = r end end
 
 	if repInfo and repInfo.friendshipFactionID > 0 then
 		local ranks = C_GossipInfo.GetFriendshipReputationRanks(factionID)
