@@ -11,7 +11,10 @@ local currentGuildName
 local DataStore = DataStore
 local IsInGuild, GetGuildInfo = IsInGuild, GetGuildInfo
 local C_Reputation, C_MajorFactions, C_GossipInfo = C_Reputation, C_MajorFactions, C_GossipInfo
-local isRetail = (WOW_PROJECT_ID == WOW_PROJECT_MAINLINE)
+
+local isRetail = AddonFactory.isRetail
+local isForever = AddonFactory.isForever
+local isMainline = isRetail or isForever
 
 local FACTION_TYPE_NORMAL = 0				-- Normal faction, save : earned
 local FACTION_TYPE_FRIENDSHIP = 1		-- Friendship faction, save : level, earned, threshold
@@ -25,13 +28,13 @@ local friendshipStandingThresholds = enum.FriendshipStandingThresholds
 local bit64 = LibStub("LibBit64")
 
 -- *** Common API ***
-local API_GetNumFactions = isRetail and C_Reputation.GetNumFactions or GetNumFactions
-local API_ExpandFactionHeader = isRetail and C_Reputation.ExpandFactionHeader or ExpandFactionHeader
-local API_CollapseFactionHeader = isRetail and C_Reputation.CollapseFactionHeader or CollapseFactionHeader
+local API_GetNumFactions = isMainline and C_Reputation.GetNumFactions or GetNumFactions
+local API_ExpandFactionHeader = isMainline and C_Reputation.ExpandFactionHeader or ExpandFactionHeader
+local API_CollapseFactionHeader = isMainline and C_Reputation.CollapseFactionHeader or CollapseFactionHeader
 local API_GetFactionInfo
 local API_GetFactionNameByID
 
-if isRetail then
+if isMainline then
 	API_GetFactionInfo = function(index) 
 			local info = C_Reputation.GetFactionDataByIndex(index)
 			if info then
@@ -60,8 +63,7 @@ local factionNameToId = {}
 
 do 
 	-- Keep the loading of factions in a narrow scope with do-end
-	local isVanilla = (WOW_PROJECT_ID == WOW_PROJECT_CLASSIC)
-	local isCata = (WOW_PROJECT_ID == WOW_PROJECT_CATACLYSM_CLASSIC)
+	local isCata = AddonFactory.isCata
 	local BF = LibStub("LibBabble-Faction-3.0"):GetUnstrictLookupTable()
 
 	local function AddFaction(id, text)
@@ -74,6 +76,7 @@ do
 		end
 		factionNameToId[text] = id
 	end
+	
 	local function RemoveFaction(id)
 		factionNameToId[factions[id]] = nil
 		factions[id] = nil
@@ -444,7 +447,7 @@ local function ScanSingleFaction(factionID, index)
 	local factions = thisCharacter.Factions
 
 	-- 1) Is it one of the new major factions since 10.0 ?
-	if isRetail and C_Reputation.IsMajorFaction(factionID) then
+	if isMainline and C_Reputation.IsMajorFaction(factionID) then
 		local data = C_MajorFactions.GetMajorFactionData(factionID)
 		
 		factions[factionID] = FACTION_TYPE_MAJOR					-- bits 0-2 : faction type, 3 bits
@@ -695,7 +698,7 @@ local function _GetReputationInfo_Retail(character, faction)
 	end
 	
 	-- is it a major faction ? (4 Dragonflight renown)
-	local isMajorFaction = (factionID and isRetail) and C_Reputation.IsMajorFaction(factionID) or false
+	local isMajorFaction = (factionID and isMainline) and C_Reputation.IsMajorFaction(factionID) or false
 
 	return currentLevel, repEarned, nextLevel, rate, isMajorFaction, isFriendshipFaction, factionID, standing
 end
@@ -759,11 +762,11 @@ AddonFactory:OnPlayerLogin(function()
 	addon:ListenTo("UPDATE_FACTION", OnUpdateFaction)
 	addon:ListenTo("COMBAT_TEXT_UPDATE", OnFactionChange)
 	
-	if isRetail then
+	if isMainline then
 		addon:ListenTo("PLAYER_GUILD_UPDATE", OnPlayerGuildUpdate)				-- for gkick, gquit, etc..
-	else	
-		addon:ListenTo("PLAYER_ALIVE", OnPlayerAlive)
 	end
+	
+	addon:ListenTo("PLAYER_ALIVE", OnPlayerAlive)
 end)
 
 
