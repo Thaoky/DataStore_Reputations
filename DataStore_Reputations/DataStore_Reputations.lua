@@ -73,6 +73,7 @@ do
 		if not text then
 			print("no value for id : " .. id)
 		-- else print("Added", id, text) --debug
+			return
 		end
 		factionNameToId[text] = id
 	end
@@ -274,8 +275,8 @@ do
 		AddFaction(2161)		-- A  - Order of Embers	(alternate ID: 2264 but this seems unused on wowhead)
 		AddFaction(2160)		-- A  - Proudmoore Admiralty (alternate ID: 2120 but this seems unused on wowhead)
 		AddFaction(2162)		-- A  - Storm's Wake (alternate ID: 2265 but this seems unused on wowhead)
-		AddFaction(2156)		-- H  - Talanji's Expedition
-		AddFaction(2157)		-- H  - The Honorbound
+		AddFaction(2156, BF["Talanji's Expedition"])		-- H  - Talanji's Expedition
+		AddFaction(2157, BF["The Honorbound"])		-- H  - The Honorbound
 		AddFaction(2163)		-- AH - Tortollan Seekers
 		AddFaction(2158, BF["Voldunai"])		-- H  - Voldunai
 		AddFaction(2103, BF["Zandalari Empire"])		-- H  - Zandalari Empire
